@@ -1,0 +1,17 @@
+# 忽略虛擬環境資料夾
+.venv/
+
+# 忽略 Python 編譯產物
+__pycache__/
+*.py[cod]
+
+# 模型與訓練輸出結果（不上傳）
+*.ckpt
+*.csv
+
+# 忽略 Jupyter Notebook 的 checkpoint（如果你有用的話）
+.ipynb_checkpoints/
+
+# 忽略 macOS / Windows 系統檔案
+.DS_Store
+Thumbs.db
