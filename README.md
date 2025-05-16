@@ -1,6 +1,6 @@
 # Vascular Spectrogram Classification
 
-本專案使用 PyTorch 與 ResNet50 模型，進行聲音訊號的時頻譜分類，用於分類血管聲音為正常或異常。
+本專案使用 PyTorch 框架進行「聲音訊號處理」與「ResNet-50 模型訓練」，將血管聲音訊號轉換為時頻圖後進行分類，以判斷聲音屬於正常血管或異常狹窄血管。
 
 ---
 ## 1. 專案簡介
@@ -8,39 +8,42 @@
 
 * 洗腎患者的血管若狹窄 (堵塞)，將無法進行洗腎，因此需藉由血管造影檢查血管是否狹窄，以進行血管疏通手術。
 
-* 由於血管造影為侵入式檢查，又因為成本問題無法普及和隨時監控，因此有此發想：利用非侵入式可攜麥克風，蒐集洗腎患者的血管聲音以做分析, 達到及時地診斷血管是否狹窄。
+* 由於血管造影為侵入式檢查，又因為成本問題無法普及和隨時監控，因而有此發想：利用非侵入式可攜麥克風，蒐集洗腎患者的血管聲音以做分析, 達到及時地診斷血管是否狹窄。
 
 ### 方法突破
-*  有別於過往血管音分析研究，首次以血管聲音的「時頻譜 (2D)」輸入 ResNet 分類模型，進行模型訓練，以分類血管狹窄與否。
+*  有別於過往血管音分析研究，使用聲音的時域訊號 (1D) 尋找統計量特徵來做分類，本專案提出以血管聲音的「時頻譜 (2D)」輸入 ResNet50 分類模型，進行模型訓練，以分類血管狹窄與否。
 
-* 以均值濾波搭配低通濾波，研究出能準確切割大量單一週期訊號的方法, 以獲得大量訓練樣本。(模型的 input data 為一個週期訊號的時頻譜，訊號的波峰與波峰之間唯一週期)。
+* 以均值濾波搭配低通濾波，提出能準確定位血管聲音訊號波峰的方法，達成有效將一段訊號切割出大量單一週期訊號, 以獲得大量訓練樣本。(ResNet 模型的 input data 為多個單一週期訊號的時頻譜，其中，訊號的波峰與波峰之間為一個週期)。
+
 
 ## 2. 方法說明
 ### 蒐集聲音訊號
-* 由醫師協助定位並標示要量測的血管位置，並標記此血管為狹窄 (stenosis) 或正常 (normal)。
+* 由醫師協助定位並標示要量測的血管位置，並提供此血管位置為狹窄 (stenosis) 或正常 (normal) 的資訊。
 * 收音裝置取樣頻率為22050 elements/sec. (即每秒紀錄22050 個樣本點)。
 
 ### 聲音訊號處理
 以下步驟程式碼存放於：audio_processing/
 
-* 低通濾波：設定截止頻率為 1000 Hz, 將原始訊號濾除頻率 1000 Hz 以上的訊號。 (參考 Pyaudio_create_lowpass_1k.py)
+* 低通濾波：使用 torchaudio 套件，設定截止頻率為 1000 Hz，濾除高於此頻率的成分以降低雜訊干擾。(參考 Pyaudio_create_lowpass_1k.py)
 
-* 均值濾波：將訊號的每一點與其周圍的點做平均, 降低訊號雜訊，以利後續定位波峰切割訊號。 (參考 Pyaudio_create_medium_filter_1k.py)
+* 均值濾波：使用 torchaudio 套件，透過滑動窗口對訊號進行均值處理，使整體波形更加平滑，達到大部分訊號點的振幅接近，但波峰振幅仍然保持相對高度，有助於後續的波峰定位與訊號切割。(參考 pyaudio_create_medium_filter_1k.py)
 
-* 切割訊號：根據均值濾波後的波型定位波峰 (下圖橘色波形)，並將位置對應到低通濾波後的訊號 (下圖藍色波形)，對其切割出每一周期。PS.將藍色的單一週期訊號，由短時傅立葉轉換為時頻譜，即為 ResNet 的訓練資料 (參考 pyaudio_peak_cut.py) 
+* 切割訊號：使用 scipy 套件中的 find_peaks 函數，設定振幅門檻值 (threshold) 與波峰間距 (distance)，定位經均值濾波後的波峰位置 (下圖橘色波形)，並對應至低通濾波後的原始訊號 (下圖藍色波形)，切割出每一週期的訊號片段。
+註：這些週期片段會經短時傅立葉轉換（STFT）轉換為時頻圖，作為 ResNet 模型的訓練資料。(參考 pyaudio_peak_cut.py)
 ![切割訊號示意圖](images/cut_signal.png)
 
 ### 訓練分類模型 
 以下步驟皆參考：spectrogram_classification/pyaudio_training_resnet50.py
 
-* 建立訓練集與測試集：兩集依病人為單位來分割 (同一病人的聲音訊號不會同時出現在 train set & test set)，正常樣本標記為 0, 狹窄樣本標記為 1。
+* 建立訓練集與測試集：使用 torch 套件。資料依病人為單位進行切分，確保同一病人的多筆聲音資料不會同時出現在訓練集與測試集中。正常樣本標記為 0，狹窄樣本標記為 1。
 
-* 產生時頻譜圖：利用短時傅立葉轉換，將每個單一週期訊號，由一維的時域訊號，轉換為二維的時頻域。
+* 產生時頻譜圖：使用 torchaudio 套件，對每個單一週期的聲音訊號進行短時傅立葉轉換（STFT），將原本一維的時域訊號轉換為二維的時頻圖，以供模型作為輸入特徵。
 
-* 建立分類模型：載入 torchvision 內建的 ResNet50 模型架構, 其架構是從 VGGNet (一般CNN) 改良而來。
+* 建立分類模型：使用 torchvision 套件載入內建的 ResNet-50 預訓練模型。調整模型參數的過程中，由於時頻圖為灰階圖像，需將模型的輸入通道數 (in_channels) 調整為 1。
 
-* 模型績效指標：使用準確度 (accuracy)、敏感度 (sensitivity)、特意度 (specificity)。
+* 模型訓練：使用 torch 套件。進行 label 的 one-hot 編碼、模型前向傳播、計算 loss (本專案使用 binary Cross Entropy Loss function)、反向傳播更新參數等步驟。
 
+* 模型測試：以準確度 (Accuracy)、敏感度 (Sensitivity)、特異度 (Specificity)作為模型效能評估指標。
 
 
 ## 3. 專案結構
@@ -49,7 +52,7 @@
 vascular_spectrogram_classification/
 │
 ├── audio_processing/                           
-│  ├── abnormal/                          # 存放洗腎患者阻塞血管的原始音檔 (WAV)
+│  ├── abnormal/                          # 存放洗腎患者狹窄血管的原始音檔 (WAV)
 │  ├── normal/                            # 存放洗腎患者正常血管的原始音檔 (WAV)
 │  ├── output/                            # 經由 python 訊號處理後的所有音檔 (WAV)
 │  ├── Pyaudio_create_lowpass_1k.py       # 對正常與狹窄的音檔進行低通濾波處理
@@ -57,15 +60,14 @@ vascular_spectrogram_classification/
 │  └── pyaudio_peak_cut.py                # 對濾波後的波型定位波峰，並切割出多個單一週期訊號
 │
 ├── spectrogram_classification/                 
-│  ├── abnormal_peak_cut_1k_selected/    # 存放血管阻塞的單一週期訊號 (WAV)
-│  ├── normal_peak_cut_1k_selected/      # 存放血管正常的單一週期訊號 (WAV)
+│  ├── abnormal_peak_cut_1k_selected/    # 存放狹窄血管的單一週期訊號 (WAV)
+│  ├── normal_peak_cut_1k_selected/      # 存放正常血管的單一週期訊號 (WAV)
 │  └── pyaudio_training_resnet50.py      # 利用 STFT 生成時頻譜，並使用 ResNet50 進行二分類訓練
 │
 ├── README.md                            # 專案說明文件 
 └── requirements.txt                     # 所需套件列表 (其中 PyTorch 相關套件為 CPU 版本)
 ```
 
----
 
 ## 4. 注意事項
 ### 關於套件版本
