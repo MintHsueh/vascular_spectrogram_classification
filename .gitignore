@@ -15,3 +15,6 @@ __pycache__/
 # 忽略 macOS / Windows 系統檔案
 .DS_Store
 Thumbs.db
+
+# ignore output file
+audio_processing/output/
