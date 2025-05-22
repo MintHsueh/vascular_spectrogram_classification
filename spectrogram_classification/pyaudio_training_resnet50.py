@@ -15,7 +15,6 @@ from torch.utils.data import Dataset, DataLoader
 from torchvision.models import resnet50
 import torchvision.transforms as transforms
 
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")   # 偵測 CPU / CUDA
 
 # 回傳 normal 與 abnormal 病人編號的聯集與交集 (之後 test set 的病人會從交集中取，其餘病人則當 train set)
 def get_total_patient(normal_folder_path,abnormal_folder_path):
@@ -316,6 +315,6 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
